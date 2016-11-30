@@ -33,8 +33,10 @@ def load_labels(data_dir, filename):
     return to_one_hot(data, 10)
 
 
-def load_mnist(data_dir='data', test=False, flat=True):
-    data_dir = os.path.join(data_dir, 'mnist')
+def load_mnist(base_dir='data', data_dir='mnist', test=False, flat=True):
+    data_dir = os.path.join(base_dir, data_dir)
+    if not os.path.isdir(data_dir):
+        os.makedirs(data_dir)
     if not test:
         x = load_images(data_dir, 'train-images-idx3-ubyte.gz')
         y = load_labels(data_dir, 'train-labels-idx1-ubyte.gz')
