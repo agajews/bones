@@ -161,3 +161,7 @@ def placeholder_like(arr, name=None, dynamic_batch=True, dtype=None):
     if dtype is None:
         dtype = arr_dtype
     return tf.placeholder(dtype, shape, name=name)
+
+
+def scalar_placeholder(dtype=tf.float32):
+    return tf.placeholder(dtype)
