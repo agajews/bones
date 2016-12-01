@@ -2,7 +2,6 @@ import tensorflow as tf
 import numpy as np
 from collections import OrderedDict
 import random
-from pprint import pprint
 
 
 def unique(l):
@@ -23,31 +22,6 @@ def mean(l):
         total += elem
         length += 1
     return total / length
-
-
-# def flat_tensors(tensors):
-#     if len(tensors) == 0:
-#         return []
-#     all_tensors = tensors + flatten([flat_tensors([i for i in t.op.inputs])
-#                                      for t in tensors])
-#     return unique(all_tensors)
-
-
-# def flat_ops(ops):
-#     if len(ops) == 0:
-#         return []
-#     all_ops = ops + flatten([flat_ops([i.op for i in op.inputs])
-#                              for op in ops])
-#     return unique(all_ops)
-
-
-# def all_variables(tensors):
-#     if not isinstance(tensors, list):
-#         tensors = [tensors]
-#     # tensors = flat_tensors(tensors)
-#     ops = flat_ops([t.op for t in tensors])
-#     variables = [o.outputs[0] for o in ops if o.type == 'Variable']
-#     return variables
 
 
 def prod(l):
@@ -130,23 +104,66 @@ def batch_cat_acc(model_i, x, y, size=1024, processors=None):
         [x, y], size, processors)
 
 
-def call_wrap(outputs, placeholders, sess=None):
+def call_wrap(outputs, positional, keyword=None, sess=None,
+              defaults=None, invariants=None):
     if sess is None:
         sess = tf.get_default_session()
-    if not isinstance(placeholders, list) and \
-       not isinstance(placeholders, dict):
-        placeholders = [placeholders]
-    if isinstance(placeholders, list):
-        def fn(*inputs):
-            return sess.run(outputs,
-                feed_dict={p: i for p, i in zip(placeholders, inputs)})
-    elif isinstance(placeholders, dict):
-        def fn(**inputs):
-            return sess.run(outputs,
-                feed_dict=zip_dicts(placeholders, inputs))
-    else:
-        raise Exception('Invalid placeholders input')
+    if keyword is None:
+        keyword = {}
+    if defaults is None:
+        defaults = {}
+    if invariants is None:
+        invariants = {}
+    if isinstance(positional, dict):
+        keyword.update(positional)
+        positional = []
+    if not isinstance(positional, list):
+        positional = [positional]
+    for key, val in list(keyword.items()):
+        if not isinstance(key, str):
+            keyword.pop(key)
+            invariants[key] = val
+
+    # print('positional:', positional)
+    # print('keyword:', keyword)
+    # print('defaults:', defaults)
+    # print('invariants:', invariants)
+
+    def fn(*inputs, **kwinputs):
+        feed_dict = {}
+        all_kwinputs = kwinputs.copy()
+        all_kwinputs.update(defaults)
+        feed_dict.update(zip_dicts(keyword, all_kwinputs))
+        feed_dict.update(invariants)
+        feed_dict.update({p: i for p, i in zip(positional, inputs)})
+        return sess.run(outputs, feed_dict=feed_dict)
     return fn
+
+
+# def call_wrap(outputs, placeholders, sess=None, defaults=None):
+#     if sess is None:
+#         sess = tf.get_default_session()
+#     if not isinstance(placeholders, list) and \
+#        not isinstance(placeholders, dict):
+#         placeholders = [placeholders]
+#     if isinstance(placeholders, list):
+#         def fn(*inputs):
+#             return sess.run(outputs, feed_dict={p: i for p, i in
+#                                                 zip(placeholders, inputs)})
+#     elif isinstance(placeholders, dict):
+#         if defaults is None:
+#             def fn(**inputs):
+#                 return sess.run(outputs,
+#                                 feed_dict=zip_dicts(placeholders, inputs))
+#         else:
+#             def fn(**inputs):
+#                 all_inputs = defaults.copy()
+#                 all_inputs.update(inputs)
+#                 return sess.run(
+#                     outputs, feed_dict=zip_dicts(placeholders, all_inputs))
+#     else:
+#         raise Exception('Invalid placeholders input')
+#     return fn
 
 
 def placeholder_like(arr, name=None, dynamic_batch=True, dtype=None):

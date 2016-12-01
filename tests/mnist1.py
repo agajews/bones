@@ -12,16 +12,15 @@ model = sequential([
     conv([5, 5], 64),
     maxpool([2, 2], strides=[2, 2]),
     linear(1024),
-    dropout(0.5),
+    dropout(dropout_prob),
+    linear(100),
     linear(10, activ=softmax)
 ])(x_in)
 loss = xentropy(model, y_in)
-optim = adam(lr=0.0001)(model)
-model_fn = call_wrap(model, x_in)
-loss_fn = call_wrap(loss, [x_in, y_in])
-train_fn = call_wrap([loss, optim], {'x': x_in, 'y': y_in,
-                                     'dropout': dropout_prob},
-                     defaults={'dropout': 0.5})
+optim = adam(lr=0.0001)(loss)
+model_fn = call_wrap(model, x_in, {dropout_prob: 1.0})
+loss_fn = call_wrap(loss, [x_in, y_in], {dropout_prob: 1.0})
+train_fn = call_wrap([loss, optim], {'x': x_in, 'y': y_in, dropout_prob: 0.5})
 intialize_vars()
 
 
@@ -30,7 +29,7 @@ def update(step, epoch, batch_x, batch_y):
     if step % 500 == 0:
         print('Loss at step {:d}, epoch {:d}: {:0.4f}'
               .format(step, epoch, curr_loss))
-for_batches(update, [x, y], 128, steps=20000)
+for_batches(update, [x, y], 128, steps=2000)
 print('Final loss: {:0.4f}'.format(mean_batches(loss_fn, [x, y])))
 print('Train accuracy: {:0.2f}%'.format(batch_cat_acc(model_fn, x, y) * 100))
 test_x, test_y = load_mnist(flat=False, test=True)

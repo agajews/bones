@@ -131,6 +131,10 @@ def crossentropy(log_clip=1e-10):
 xentropy = crossentropy()
 
 
+def mse(y_hat, y):
+    return umean((y_hat - y) ** 2)
+
+
 def grads(x, selector=None):
     if selector is None:
         variables = tf.global_variables()
@@ -144,9 +148,10 @@ def grads(x, selector=None):
 
 
 def sgd(lr=0.1):
-    def fn(grads_and_vars):
+    def fn(x, var_scope=None):
+        variables = scope_variables(var_scope)
         optim = tf.train.GradientDescentOptimizer(learning_rate=lr)
-        return optim.apply_gradients(grads_and_vars)
+        return optim.minimize(x, var_list=variables)
     return fn
 
 
