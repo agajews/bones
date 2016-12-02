@@ -42,6 +42,7 @@ tanh = tf.tanh
 sigmoid = tf.sigmoid
 softmax = tf.nn.softmax
 relu = tf.nn.relu
+identity = lambda x: x
 
 
 def linear(nodes, W_init=normal(), b_init=zeros, activ=relu, name='fc'):
