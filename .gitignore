@@ -3,3 +3,4 @@ data/
 *.pyo
 */__pycache__/
 .#*
+*.log
