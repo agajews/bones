@@ -21,7 +21,7 @@ optim = adam(lr=0.0001)(loss)
 model_fn = call_wrap(model, x_in, {dropout_prob: 1.0})
 loss_fn = call_wrap(loss, [x_in, y_in], {dropout_prob: 1.0})
 train_fn = call_wrap([loss, optim], {'x': x_in, 'y': y_in, dropout_prob: 0.5})
-intialize_vars()
+initialize_vars()
 
 
 def update(step, epoch, batch_x, batch_y):

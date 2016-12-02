@@ -12,11 +12,14 @@ def scope_variables(scope):
         return tf.contrib.framework.get_variables(scope=scope)
 
 
-def intialize_vars(scope=None, sess=None):
+def initialize_vars(scope=None, sess=None, execute=True):
     variables = scope_variables(scope)
+    init_op = tf.variables_initializer(variables)
     if sess is None:
         sess = tf.get_default_session()
-    sess.run(tf.variables_initializer(variables))
+    if execute:
+        sess.run(init_op)
+    return init_op
 
 
 def sequential(layers):
@@ -147,20 +150,20 @@ def grads(x, selector=None):
     return zip(grads, variables)
 
 
-def sgd(lr=0.1):
+def sgd(lr=0.1, gs=None):
     def fn(x, var_scope=None):
         variables = scope_variables(var_scope)
         optim = tf.train.GradientDescentOptimizer(learning_rate=lr)
-        return optim.minimize(x, var_list=variables)
+        return optim.minimize(x, var_list=variables, global_step=gs)
     return fn
 
 
-def adam(lr=0.001, beta1=0.9, beta2=0.999, epsilon=1e-08):
+def adam(lr=0.001, beta1=0.9, beta2=0.999, epsilon=1e-08, gs=None):
     def fn(x, var_scope=None):
         variables = scope_variables(var_scope)
         optim = tf.train.AdamOptimizer(learning_rate=lr,
                                        beta1=beta1,
                                        beta2=beta2,
                                        epsilon=epsilon)
-        return optim.minimize(x, var_list=variables)
+        return optim.minimize(x, var_list=variables, global_step=gs)
     return fn
