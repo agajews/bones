@@ -2,6 +2,9 @@ import tensorflow as tf
 import numpy as np
 from collections import OrderedDict
 import random
+from .core import *
+import json
+from pprint import pprint
 
 
 def unique(l):
@@ -124,11 +127,6 @@ def call_wrap(outputs, positional, keyword=None, sess=None,
             keyword.pop(key)
             invariants[key] = val
 
-    # print('positional:', positional)
-    # print('keyword:', keyword)
-    # print('defaults:', defaults)
-    # print('invariants:', invariants)
-
     def fn(*inputs, **kwinputs):
         feed_dict = {}
         all_kwinputs = kwinputs.copy()
@@ -138,32 +136,6 @@ def call_wrap(outputs, positional, keyword=None, sess=None,
         feed_dict.update({p: i for p, i in zip(positional, inputs)})
         return sess.run(outputs, feed_dict=feed_dict)
     return fn
-
-
-# def call_wrap(outputs, placeholders, sess=None, defaults=None):
-#     if sess is None:
-#         sess = tf.get_default_session()
-#     if not isinstance(placeholders, list) and \
-#        not isinstance(placeholders, dict):
-#         placeholders = [placeholders]
-#     if isinstance(placeholders, list):
-#         def fn(*inputs):
-#             return sess.run(outputs, feed_dict={p: i for p, i in
-#                                                 zip(placeholders, inputs)})
-#     elif isinstance(placeholders, dict):
-#         if defaults is None:
-#             def fn(**inputs):
-#                 return sess.run(outputs,
-#                                 feed_dict=zip_dicts(placeholders, inputs))
-#         else:
-#             def fn(**inputs):
-#                 all_inputs = defaults.copy()
-#                 all_inputs.update(inputs)
-#                 return sess.run(
-#                     outputs, feed_dict=zip_dicts(placeholders, all_inputs))
-#     else:
-#         raise Exception('Invalid placeholders input')
-#     return fn
 
 
 def placeholder_like(arr, name=None, dynamic_batch=True, dtype=None):
@@ -182,3 +154,63 @@ def placeholder_like(arr, name=None, dynamic_batch=True, dtype=None):
 
 def scalar_placeholder(dtype=tf.float32):
     return tf.placeholder(dtype)
+
+
+def vars_to_dict(var_scope=None, sess=None, run=True, tolist=False):
+    if sess is None:
+        sess = tf.get_default_session()
+    variables = scope_variables(var_scope)
+    vars_dict = {}
+    for variable in variables:
+        parent = vars_dict
+        for subscope in variable.name.split('/')[:-1]:
+            if subscope not in parent:
+                parent[subscope] = {}
+            parent = parent[subscope]
+        arr = variable
+        if run:
+            arr = sess.run(arr)
+            if tolist:
+                arr = arr.tolist()
+        parent[variable.name.split('/')[-1]] = arr
+    return vars_dict
+
+
+def _vars_assign_dict(dest_vars, vars_dict, sess=None, run=True):
+    if sess is None:
+        sess = tf.get_default_session()
+    if isinstance(dest_vars, dict) and isinstance(vars_dict, dict):
+        res = {}
+        for name in vars_dict.keys():
+            res[name] = _vars_assign_dict(dest_vars[name], vars_dict[name],
+                                          sess, run)
+        return res
+    else:
+        op = dest_vars.assign(np.asarray(vars_dict))
+        if run:
+            sess.run(op)
+        return op
+
+
+def dict_name_shape(dictionary):
+    if not any([isinstance(val, dict) for key, val in dictionary.items()]):
+        return list(dictionary.keys())
+    else:
+        return {key: dict_name_shape(val) for key, val in dictionary.items()}
+
+
+def vars_assign_dict(var_scope, vars_dict, sess=None, run=True):
+    dest_vars = vars_to_dict(var_scope, sess, run=False)
+    print('Assigning variables:')
+    pprint(dict_name_shape(dest_vars))
+    return _vars_assign_dict(dest_vars, vars_dict, sess, run)
+
+
+def save_vars_json(fnm, var_scope=None, sess=None):
+    with open(fnm, 'w') as f:
+        f.write(json.dumps(vars_to_dict(var_scope, sess, tolist=True)))
+
+
+def load_vars_json(fnm, var_scope=None, sess=None):
+    with open(fnm, 'r') as f:
+        vars_assign_dict(var_scope, json.loads(f.read()), sess)

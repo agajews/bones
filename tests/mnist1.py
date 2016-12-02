@@ -7,14 +7,14 @@ x_in = placeholder_like(x, 'x')
 y_in = placeholder_like(y, 'y', dtype='float32')
 dropout_prob = scalar_placeholder()
 model = sequential([
-    conv([5, 5], 32),
+    conv([5, 5], 32, name='conv1'),
     maxpool([2, 2], strides=[2, 2]),
-    conv([5, 5], 64),
+    conv([5, 5], 64, name='conv2'),
     maxpool([2, 2], strides=[2, 2]),
-    linear(1024),
+    linear(1024, name='fc1'),
     dropout(dropout_prob),
-    linear(100),
-    linear(10, activ=softmax)
+    linear(100, name='fc2'),
+    linear(10, activ=softmax, name='out')
 ])(x_in)
 loss = xentropy(model, y_in)
 optim = adam(lr=0.0001)(loss)

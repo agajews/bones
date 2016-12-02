@@ -22,11 +22,12 @@ def initialize_vars(scope=None, sess=None, execute=True):
     return init_op
 
 
-def sequential(layers):
+def sequential(layers, name='sequential'):
     def fn(x):
-        for l in layers:
-            x = l(x)
-        return x
+        with scope(name):
+            for l in layers:
+                x = l(x)
+            return x
     return fn
 
 
@@ -43,15 +44,16 @@ softmax = tf.nn.softmax
 relu = tf.nn.relu
 
 
-def linear(nodes, W_init=normal(), b_init=zeros, activ=relu):
+def linear(nodes, W_init=normal(), b_init=zeros, activ=relu, name='fc'):
     def fn(x):
         shape = x.get_shape().as_list()
         if len(shape) > 2:
             x = tf.contrib.layers.flatten(x)
             shape = x.get_shape().as_list()
-        W = tf.Variable(W_init([shape[1], nodes]), name='W')
-        b = tf.Variable(b_init([nodes]), name='b')
-        return activ(tf.matmul(x, W) + b)
+        with scope(name):
+            W = tf.Variable(W_init([shape[1], nodes]), name='W')
+            b = tf.Variable(b_init([nodes]), name='b')
+            return activ(tf.matmul(x, W) + b)
     return fn
 
 
@@ -59,15 +61,16 @@ flatten = tf.contrib.layers.flatten
 
 
 def conv2d(filter_size, n_filters, strides=[1, 1], pad='SAME',
-           W_init=normal(), b_init=zeros, activ=relu):
+           W_init=normal(), b_init=zeros, activ=relu, name='conv'):
     def fn(x):
         shape = x.get_shape().as_list()
         n_channels = shape[3]
-        W = tf.Variable(W_init(filter_size + [n_channels, n_filters]),
-                        name='W')
-        b = tf.Variable(b_init([n_filters]), name='b')
-        return activ(tf.nn.conv2d(x, W, strides=[1] + strides + [1],
-                                  padding=pad) + b)
+        with scope(name):
+            W = tf.Variable(W_init(filter_size + [n_channels, n_filters]),
+                            name='W')
+            b = tf.Variable(b_init([n_filters]), name='b')
+            return activ(tf.nn.conv2d(x, W, strides=[1] + strides + [1],
+                                      padding=pad) + b)
     return fn
 
 
@@ -158,12 +161,14 @@ def sgd(lr=0.1, gs=None):
     return fn
 
 
-def adam(lr=0.001, beta1=0.9, beta2=0.999, epsilon=1e-08, gs=None):
+def adam(lr=0.001, beta1=0.9, beta2=0.999, epsilon=1e-08, gs=None,
+         name='adam'):
     def fn(x, var_scope=None):
         variables = scope_variables(var_scope)
-        optim = tf.train.AdamOptimizer(learning_rate=lr,
-                                       beta1=beta1,
-                                       beta2=beta2,
-                                       epsilon=epsilon)
-        return optim.minimize(x, var_list=variables, global_step=gs)
+        with scope(name):
+            optim = tf.train.AdamOptimizer(learning_rate=lr,
+                                           beta1=beta1,
+                                           beta2=beta2,
+                                           epsilon=epsilon)
+            return optim.minimize(x, var_list=variables, global_step=gs)
     return fn
