@@ -11,7 +11,7 @@ def unique(l):
     return list(OrderedDict.fromkeys(l))
 
 
-def flatten(l):
+def iter_flatten(l):
     res = []
     for sub in list(l):
         res += sub
@@ -77,9 +77,11 @@ def for_batches(fn, xs, size, steps=None, processors=None):
 
 
 def for_epochs(fn, xs, size, epochs=None, processors=None):
+    step = 0
     for epoch in range(epochs):
-        for batch_num, batch in enumerate(batches(xs, size, processors)):
-            fn(batch_num, epoch, *batch)
+        for batch in batches(xs, size, processors):
+            fn(step, epoch, *batch)
+            step += 1
 
 
 def map_batches(fn, xs, size, processors=None):
@@ -152,8 +154,8 @@ def placeholder_like(arr, name=None, dynamic_batch=True, dtype=None):
     return tf.placeholder(dtype, shape, name=name)
 
 
-def scalar_placeholder(dtype=tf.float32):
-    return tf.placeholder(dtype)
+def scalar_placeholder(dtype=tf.float32, name=None):
+    return tf.placeholder(dtype, name=name)
 
 
 def vars_to_dict(var_scope=None, sess=None, run=True, tolist=False):
@@ -193,6 +195,8 @@ def _vars_assign_dict(dest_vars, vars_dict, sess=None, run=True):
 
 
 def dict_name_shape(dictionary):
+    if not isinstance(dictionary, dict):
+        return
     if not any([isinstance(val, dict) for key, val in dictionary.items()]):
         return list(dictionary.keys())
     else:
@@ -214,3 +218,37 @@ def save_vars_json(fnm, var_scope=None, sess=None):
 def load_vars_json(fnm, var_scope=None, sess=None):
     with open(fnm, 'r') as f:
         vars_assign_dict(var_scope, json.loads(f.read()), sess)
+
+
+def train(model, loss, optim, x_in, y_in, x, y, test_x=None, test_y=None,
+          var_scope=None, train_dict=None, test_dict=None, sess=None,
+          epochs=None, steps=None, print_freq=500, batch_size=128,
+          print_fn=None):
+    # print(test_dict)
+    model_fn = call_wrap(model, x_in,
+                         None if test_dict is None else test_dict.copy())
+    loss_fn = call_wrap(loss, [x_in, y_in],
+                        None if test_dict is None else test_dict.copy())
+    train_fn = call_wrap([loss, optim], [x_in, y_in],
+                         None if train_dict is None else train_dict.copy())
+    initialize_vars(var_scope=var_scope, sess=sess)
+    if print_fn is None:
+        def print_fn(step, epoch, curr_loss, model_fn):
+            print('Loss at step {:d}, epoch {:d}: {:0.4f}'
+                  .format(step, epoch, curr_loss))
+
+    def update(step, epoch, batch_x, batch_y):
+        curr_loss, _ = train_fn(batch_x, batch_y)
+        if step % print_freq == 0:
+            print_fn(step, epoch, curr_loss, model_fn)
+    if epochs is not None:
+        for_epochs(update, [x, y], batch_size, epochs=epochs)
+    else:
+        for_batches(update, [x, y], batch_size, steps=steps)
+    print('Final loss: {:0.4f}'.format(
+        mean_batches(loss_fn, [x, y])))
+    print('Train accuracy: {:0.2f}%'.format(
+        batch_cat_acc(model_fn, x, y) * 100))
+    if test_x is not None and test_y is not None:
+        print('Test accuracy: {:0.2f}%'.format(
+            batch_cat_acc(model_fn, test_x, test_y) * 100))
